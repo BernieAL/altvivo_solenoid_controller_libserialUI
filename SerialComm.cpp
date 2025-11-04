@@ -21,21 +21,21 @@
 
 
 
-##include <unistd.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "serial.hpp"
+#include "SerialComm.hpp"
 
 static int fd;
 static struct termios tty;
 
 int initilize_serial (const char* port, unsigned int flags)
 {
-
+  
   fd = open(port, flags);
 
   return fd;

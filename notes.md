@@ -9,6 +9,22 @@
 main.cpp = Customer
   "I'll have a burger please" (includes the menu, calls the kitchen)
 
+
+--------------------------------------------------------------------------
+
+
+
+
+SerialComm        → Low-level serial communication (hardware layer)
+      ↓
+SolenoidController → Business logic (what operations can we do?)
+      ↓
+SolenoidState     → Data model (what's the current state?)
+      ↓
+UI Layer          →  UI framework
+
+
+---------------------------------------------------------------------------
 CORE FUNCTIONALITY OF APP
 
 
@@ -60,6 +76,12 @@ FILES AND THEIR FUNCTIONS
 
         Makes use of SERIALCOMM functions
         by wrapping in event handlers
+        operations we need to perform on a solenoid:
+            toggleSolenoid (if on, turn off vice versa)
+            activateSolenoid
+            deactivate
+            programSolenoid
+            clearSolenoid
   
 
     SOLENOIDSTATE
@@ -72,3 +94,28 @@ FILES AND THEIR FUNCTIONS
             is it active
             is it programmed
             get its timing
+
+
+---------------------------------------
+
+
+SerialComm FIle breakdown:
+
+
+    fd - file descriptor
+    is small integers that OS uses as a handle to refer to an open file or device
+    in unix/linux, serial ports are treated as files - so when you open a serial port
+    you get back a file descriptor that we use for all subsequent operations on that port
+
+
+    initialize_serial() - "opens door to serial port"
+        this opens the target serial port device file and return the file descriptor
+        
+
+    configure_serial() - "sets ruls of how to communicate through the door"
+        uses returned fd from init_serial to configure how the serial comm works
+        configures serial port params through termios structure (tty)
+
+
+    write bytes/read bytes - uses file descriptor to send/recieve data
+

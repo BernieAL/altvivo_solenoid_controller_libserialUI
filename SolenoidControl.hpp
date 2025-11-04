@@ -1,5 +1,5 @@
 #include "SolenoidState.hpp"
-#include "serial.hpp"
+#include "SerialComm.hpp"
 
 
 

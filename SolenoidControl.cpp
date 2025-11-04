@@ -1,4 +1,4 @@
-# include "SolenoidController.hpp"
+#include "SolenoidControl.hpp"
 
 
 SolenoidController::SolenoidController(){
@@ -25,7 +25,7 @@ void SolenoidController::sendCommand(unsigned char cmd, unsigned char device,
 
 void SolenoidController::toggleSolenoid(size_t index){
 
-    if (index >= state.count()) return;
+    if (index >= state.solenoid_count()) return;
 
     bool newState = !=state.isActive(index);
 
@@ -39,11 +39,43 @@ void SolenoidController::toggleSolenoid(size_t index){
 
 
 void SolenoidController::activateSolenoid(size_t index) {
-    if (index >= state.count()) return;
+    if (index >= state.solenoid_count()) return;
     
     state.setActive(index, true);
     sendCommand(CMD_SOLENOID, static_cast<unsigned char>(index), 0x01, 0x00);
 }
 
+void SolenoidController::programSolenoid(size_t index, int openTime, int closeTime) {
+    if (index >= state.solenoid_count()) return;
+    
+    // Check if clearing (both zero)
+    if (openTime == 0 && closeTime == 0) {
+        clearSolenoid(index);
+        return;
+    }
+    
+    SolenoidTiming timing = {openTime, closeTime};
+    state.setTiming(index, timing);
+}
 
+void SolenoidController::clearSolenoid(size_t index) {
+    if (index >= state.solenoid_count()) return;
+    
+    state.clearTiming(index);
+}
 
+// ----------------------------------------------------------------------------
+// Pressure operations
+// ----------------------------------------------------------------------------
+
+void SolenoidController::setPositivePressure(int percentage) {
+    if (percentage < 0 || percentage > 100) return;
+    
+    sendCommand(CMD_PRESSURE, 0x01, static_cast<unsigned char>(percentage), 0x00);
+}
+
+void SolenoidController::setVacuum(int percentage) {
+    if (percentage < 0 || percentage > 100) return;
+    
+    sendCommand(CMD_PRESSURE, 0x02, static_cast<unsigned char>(percentage), 0x00);
+}

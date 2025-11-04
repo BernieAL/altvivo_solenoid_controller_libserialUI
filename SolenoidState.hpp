@@ -89,5 +89,5 @@ public:
     void clearTiming(size_t index);
     
     // Utility
-    size_t count() const { return NUM_SOLENOIDS; }
+    size_t solenoid_count() const { return NUM_SOLENOIDS; }
 };
