@@ -1,18 +1,12 @@
 #!/usr/bin/bash
 
-SRC_FILES="solenoid-control.cpp SolenoidTimingDialog.cpp serial.cpp"
+SRC_FILES="main.cpp SolenoidControl.cpp SolenoidState.cpp SerialComm.cpp"
 
+# Remove prev build
+rm -fv test-solenoid
 
-#remove prev build
-rm -fv solenoid-control
-#recompile
-g++ -o solenoid-control -std=c++11 $SRC_FILES -g `wx-config --cxxflags --libs`
+# Recompile
+g++ -o test-solenoid -std=c++11 $SRC_FILES -g
 
-
-# Fix snap package interference (vscode)
-#force to not look in snap folders
-export GTK_PATH=
-export GTK_MODULES=
-
-#execute program
-./solenoid-control                                       
+# Execute program
+./test-solenoid

@@ -33,7 +33,7 @@
 static int fd;
 static struct termios tty;
 
-int initilize_serial (const char* port, unsigned int flags)
+int initialize_serial (const char* port, unsigned int flags)
 {
   
   fd = open(port, flags);

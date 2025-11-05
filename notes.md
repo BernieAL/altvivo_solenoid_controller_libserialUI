@@ -1,4 +1,4 @@
-## Quick Mental Model
+## Quick Mental Model hpp,cpp
 ```
 .hpp = Restaurant Menu
   "We offer: Burger, Fries, Shake"
@@ -13,15 +13,38 @@ main.cpp = Customer
 --------------------------------------------------------------------------
 
 
+SolenoidControl = Operations we can perform (toggle, activate, program, etc.) ✅
+SolenoidState = Data model tracking each solenoid's state (active, programmed, timing) ✅
+SerialComm = Hardware-level communication (read/write bytes to serial ports) ✅
 
 
-SerialComm        → Low-level serial communication (hardware layer)
-      ↓
-SolenoidController → Business logic (what operations can we do?)
-      ↓
-SolenoidState     → Data model (what's the current state?)
-      ↓
-UI Layer          →  UI framework
+--------------------------------------------------------------
+
+All SOLENOIDS ON SINGLE SERIAL PORT
+
+    all 16 solenoids use ONE serial port
+    we differentiate by using the device ID
+    in the command protocol
+
+    Ex.
+        - **One serial port** (e.g., `/dev/ttyUSB0`)
+        - **16 solenoids** identified by device_id (0-15)
+        - Commands sent over that single port specify which solenoid to control
+
+
+    main.cpp
+    ↓
+    Initialize serial port once (/dev/ttyUSB0)
+    ↓
+    SolenoidController
+    ↓ (uses)
+        ├→ SolenoidState (tracks state of all 16 solenoids in memory)
+        └→ SerialComm (sends commands to hardware via ONE serial port)
+        ↓
+    Hardware receives commands and routes to correct solenoid based on device_id
+
+
+
 
 
 ---------------------------------------------------------------------------
@@ -63,7 +86,7 @@ CORE FUNCTIONALITY OF APP
 
 FILES AND THEIR FUNCTIONS
 
-    SERIALCOMM.CPP
+    SERIALCOMM.CPP - hw level communication through serial port
 
         get list of serial ports (usb filtered)
         write bytes to serial port
@@ -75,7 +98,6 @@ FILES AND THEIR FUNCTIONS
     SOLENOIDCONTROL.CPP
 
         Makes use of SERIALCOMM functions
-        by wrapping in event handlers
         operations we need to perform on a solenoid:
             toggleSolenoid (if on, turn off vice versa)
             activateSolenoid
@@ -119,3 +141,35 @@ SerialComm FIle breakdown:
 
     write bytes/read bytes - uses file descriptor to send/recieve data
 
+----------------------------------------------------
+
+COMMAND STRUCTURE
+
+Every command sent looks like this:
+
+[0xFE, 0xED, command_type, device_id, value_high, value_low]
+ └─────┬────┘ └────┬────┘ └────┬───┘ └─────────┬──────────┘
+   Header      What to do   Which one      Additional data
+
+
+0xFE vs 0xED - these are header bytes
+
+we start every command with a unique pattern
+to indicate that a real command is coming vs random garbage values
+
+this unique pattern is not likely to occur in random noise
+
+Ex for turning on solenoid #3
+unsigned char data[] = {0xFE, 0xED, 0x01, 0x03, 0x01, 0x00};
+                      //  ^^   ^^   ^^   ^^   ^^   ^^
+                      //  |    |    |    |    |    └─ value_low (unused here)
+                      //  |    |    |    |    └────── value_high (0x01 = ON)
+                      //  |    |    |    └─────────── device_id (solenoid 3)
+                      //  |    |    └──────────────── command_type (0x01 = solenoid control)
+                      //  |    └───────────────────── Header byte 2
+                      //  └────────────────────────── Header byte 1
+
+
+The MCU on the other end checks for the header bytes
+only if header bytes are rec'd that match FEED do we read the rest of the
+bytes and execute the command

@@ -3,19 +3,17 @@
 
 
 
+class SolenoidControl{
 
-
-
-
-
-class SolenoidController{
+    
 
 private:
-        Solenoid state;
+        SolenoidState state;
 
 
     //protocol constants
-    static constexpr unsigned char HEADER[] = {0xFE, 0xED};
+    static constexpr unsigned char HEADER_BYTE1 = 0xFE;  
+    static constexpr unsigned char HEADER_BYTE2 = 0xED;  
     static constexpr unsigned char CMD_SOLENOID = 0x01;
     static constexpr unsigned char CMD_PRESSURE = 0x02;
 
@@ -25,11 +23,12 @@ private:
     //made private to force use of public self-explanatory methods
     //public methods will make use of this method
     //will make use of write_bytes (serial.hpp)
-    void sendCommand()
+    void sendCommand(unsigned char cmd, unsigned char device,
+                 unsigned char value_high, unsigned char value_low);
 
 
 public:
-    SolenoidController();
+    SolenoidControl();
 
     //Solenoid operations
     void toggleSolenoid(size_t index);
@@ -39,9 +38,9 @@ public:
     void clearSolenoid(size_t index);
 
     //Pressure operations
-    void setPositivePressure();
+    void setPositivePressure(int percentage);
     void setVacuum(int percentage);
 
     //state access (read-only)
     const SolenoidState& getState() const { return state; }
-}
+};
