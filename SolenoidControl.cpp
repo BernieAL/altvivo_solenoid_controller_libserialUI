@@ -18,6 +18,7 @@ SolenoidControl::SolenoidControl(){
 
 
 //helper for low level details
+//includes header bytes by default 
 void SolenoidControl::sendCommand(unsigned char cmd, unsigned char device,
                                      unsigned char value_high, unsigned char value_low) {
     unsigned char data[] = {HEADER_BYTE1, HEADER_BYTE2, cmd, device, value_high, value_low};

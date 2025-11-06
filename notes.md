@@ -1,3 +1,26 @@
+
+TO DO
+
+    DONE - Seperated UI and Logic 
+
+    DONE - converted serialcomm to user libserial
+
+    Second command to clear toggle
+
+    1ms timeout in case msg gets messedup
+
+    comp byte of handshake sent back from MCU
+
+    refresh ports when something gets plugged in
+
+    ensure sliders work and are sending commands
+
+    UI - wxwidgets
+    
+
+
+
+---------------------------------------
 ## Quick Mental Model hpp,cpp
 ```
 .hpp = Restaurant Menu
