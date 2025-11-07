@@ -1,7 +1,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Name:        main_gui.cpp
 // Purpose:     GUI to control solenoids and pressure regulators
-// Author:      Mark Volosov
+// Author:      Bernardino Almanzar
 // Modified by:
 // Created:
 // Copyright:   (c) AltVivo
@@ -33,13 +33,12 @@
 #endif
 
 #include <vector>
-#include "SolenoidState.hpp"        
+#include <string>
+#include "SolenoidState.hpp"
 #include "global-constants.hpp"
 #include "SolenoidTimingDialog.hpp"
 #include "SolenoidControl.hpp"
 #include "SerialComm.hpp"
-
-
 
 // ----------------------------------------------------------------------------
 // private classes
@@ -67,9 +66,11 @@ private:
     SolenoidControl controller;
 
     wxMenu *serialMenu;
+    wxTimer *portRefreshTimer;  // Auto-refresh timer
 
     // UI elements
     std::vector<wxButton *> sol_buttons;
+    std::vector<wxButton *> clear_buttons;
     wxSlider *positive_pressure_slider;
     wxSlider *vacuum_slider;
 
@@ -77,11 +78,16 @@ private:
     wxDECLARE_EVENT_TABLE();
     void Sol_Button_Clicked(wxCommandEvent &event);
     void Sol_Button_Program(wxMouseEvent &event);
+    void Clear_Button_Clicked(wxCommandEvent &event);
     void OnPositivePressureSlider(wxCommandEvent &event);
     void OnVacuumSlider(wxCommandEvent &event);
+    void PopulateSerialPortMenu(); 
+    void OnRefreshPorts(wxCommandEvent &event);
+    void OnPortRefreshTimer(wxTimerEvent &event); 
 
     // Helper methods
     void UpdateButtonAppearance(size_t index);
+    void UpdateClearButtonVisibility(size_t index);
 };
 
 // ----------------------------------------------------------------------------
@@ -91,8 +97,11 @@ private:
 enum
 {
     Serial_Menu_ID = 100,
+    Serial_Refresh_ID = 200,
+    Port_Refresh_Timer_ID = 300, 
     Minimal_Quit = wxID_EXIT,
-    Minimal_About = wxID_ABOUT
+    Minimal_About = wxID_ABOUT,
+    CLEAR_BUTTON_ID_BASE = 1000
 };
 
 // ----------------------------------------------------------------------------
@@ -101,10 +110,12 @@ enum
 
 wxBEGIN_EVENT_TABLE(MyFrame, wxFrame)
     EVT_MENU(Minimal_Quit, MyFrame::OnQuit)
-        EVT_MENU(Minimal_About, MyFrame::OnAbout)
-            wxEND_EVENT_TABLE()
+    EVT_MENU(Serial_Refresh_ID, MyFrame::OnRefreshPorts)
+    EVT_MENU(Minimal_About, MyFrame::OnAbout)
+    EVT_TIMER(Port_Refresh_Timer_ID, MyFrame::OnPortRefreshTimer)  
+wxEND_EVENT_TABLE()
 
-                wxIMPLEMENT_APP(MyApp);
+wxIMPLEMENT_APP(MyApp);
 
 // ============================================================================
 // implementation
@@ -132,14 +143,11 @@ bool MyApp::OnInit()
 MyFrame::MyFrame(const wxString &title)
     : wxFrame(nullptr, wxID_ANY, title)
 {
-    // Set the frame icon
-    // SetIcon(wxICON(sample));
-
     // Set theme colors
     SetBackgroundColour(BACKGROUND_BLACK);
     SetForegroundColour(FOREGROUND_WHITE);
 
-    // ========================================================================
+   // ========================================================================
     // Create menu bar
     // ========================================================================
 
@@ -147,26 +155,11 @@ MyFrame::MyFrame(const wxString &title)
     wxMenu *fileMenu = new wxMenu;
     wxMenu *helpMenu = new wxMenu;
 
-    // Populate serial port menu
-    struct serial_ports_list *ports_list = get_ports();
+    // Add refresh item at the top
+    serialMenu->Append(Serial_Refresh_ID, "&Refresh Port List\tF5", "Refresh available serial ports");
+    serialMenu->AppendSeparator(); // Separator line
 
-    if (ports_list != NULL)
-    {
-        for (ssize_t i = 0; i < ports_list->length; i++)
-        {
-            int menu_id = Serial_Menu_ID + i;
-            serialMenu->Append(menu_id, ports_list->list[i], "Open This Port");
-            Bind(wxEVT_MENU, &MyFrame::OnSerialPortSelected, this, menu_id);
-        }
-
-        // Free port list memory
-        for (ssize_t i = 0; i < ports_list->length; i++)
-        {
-            free(ports_list->list[i]);
-        }
-        free(ports_list->list);
-        free(ports_list);
-    }
+    // DON'T populate ports yet - status bar doesn't exist
 
     helpMenu->Append(Minimal_About, "&About\tF1", "Show about dialog");
     fileMenu->Append(Minimal_Quit, "&Exit\tAlt-X", "Quit this program");
@@ -184,6 +177,9 @@ MyFrame::MyFrame(const wxString &title)
     SetStatusText("Welcome! Please connect a serial port.");
 #endif
 
+    // ✅ NOW populate the port list (status bar exists)
+    PopulateSerialPortMenu();
+
     // ========================================================================
     // Create solenoid button panel
     // ========================================================================
@@ -192,6 +188,7 @@ MyFrame::MyFrame(const wxString &title)
     wxSize sol_button_size = FromDIP(wxSize(64, 64));
 
     sol_buttons.reserve(NUM_OF_SOLENOIDS);
+    clear_buttons.reserve(NUM_OF_SOLENOIDS);
 
     wxFlexGridSizer *sol_gridSizer = new wxFlexGridSizer(NUM_OF_ROWS,
                                                          NUM_OF_COLS,
@@ -209,17 +206,42 @@ MyFrame::MyFrame(const wxString &title)
         sol_gridSizer->AddGrowableRow(row, 1);
     }
 
-    // Create all solenoid buttons
+    // Create all solenoid buttons with overlays
     for (size_t i = 0; i < NUM_OF_SOLENOIDS; i++)
     {
-        wxButton *button = new wxButton(sol_panel, SOL_ID_BASE + i, "");
+        // Create a panel to hold both the solenoid button and clear button
+        wxPanel *button_panel = new wxPanel(sol_panel, wxID_ANY);
+
+        // Main solenoid button (fills the panel)
+        wxButton *button = new wxButton(button_panel, SOL_ID_BASE + i, "",
+                                        wxDefaultPosition, wxDefaultSize);
         button->SetBackgroundColour(BUTTON_RED);
         button->SetMinSize(sol_button_size);
         sol_buttons.push_back(button);
-        sol_gridSizer->Add(button, 1, wxEXPAND | wxALL, 2);
 
         button->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &MyFrame::Sol_Button_Clicked, this);
         button->Bind(wxEVT_RIGHT_UP, &MyFrame::Sol_Button_Program, this);
+
+        // Clear button (small, at bottom, initially hidden)
+        wxButton *clear_btn = new wxButton(button_panel, CLEAR_BUTTON_ID_BASE + i, "Clear",
+                                           wxDefaultPosition, FromDIP(wxSize(50, 20)));
+        clear_btn->SetBackgroundColour(wxColour(80, 80, 80)); // Dark gray
+        clear_btn->SetForegroundColour(*wxWHITE);
+        clear_btn->SetFont(clear_btn->GetFont().MakeSmaller());
+        clear_btn->Hide(); // Start hidden
+        clear_buttons.push_back(clear_btn);
+
+        clear_btn->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &MyFrame::Clear_Button_Clicked, this);
+
+        // Layout: Main button fills space, clear button overlays at bottom
+        wxBoxSizer *overlay_sizer = new wxBoxSizer(wxVERTICAL);
+        overlay_sizer->Add(button, 1, wxEXPAND);
+        overlay_sizer->Add(clear_btn, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 2);
+
+        // Position clear button to overlay at bottom
+        button_panel->SetSizer(overlay_sizer);
+
+        sol_gridSizer->Add(button_panel, 1, wxEXPAND | wxALL, 2);
     }
 
     sol_panel->SetSizer(sol_gridSizer);
@@ -273,10 +295,21 @@ MyFrame::MyFrame(const wxString &title)
     SetMinClientSize(wxSize(600, 500));
     SetClientSize(wxSize(800, 700));
     SetSizer(main_sizer);
+
+    // Start auto-refresh timer (refresh every 2 seconds)
+    portRefreshTimer = new wxTimer(this, Port_Refresh_Timer_ID);
+    portRefreshTimer->Start(2000);  // 2000ms = 2 seconds
 }
 
 MyFrame::~MyFrame()
 {
+    // Stop and delete the timer
+    if (portRefreshTimer)
+    {
+        portRefreshTimer->Stop();
+        delete portRefreshTimer;
+    }
+
     // Clean up serial port on exit
     if (serial_is_open())
     {
@@ -293,7 +326,7 @@ void MyFrame::Sol_Button_Clicked(wxCommandEvent &event)
     int button_id = event.GetId();
     size_t index = button_id - SOL_ID_BASE;
 
-    // Use controller to toggle solenoid - it handles all the state and serial logic
+    // Use controller to toggle solenoid
     controller.toggleSolenoid(index);
 
     // Update button appearance based on new state
@@ -316,7 +349,7 @@ void MyFrame::Sol_Button_Program(wxMouseEvent &event)
         // Use controller to program the solenoid
         controller.programSolenoid(index, timing.openTime, timing.closeTime);
 
-        // Update button label based on programming
+        // Update button label and clear button visibility
         const Solenoid &sol = controller.getState().get(index);
 
         if (sol.programmed)
@@ -328,16 +361,44 @@ void MyFrame::Sol_Button_Program(wxMouseEvent &event)
                                            index,
                                            sol.timing.openTime,
                                            sol.timing.closeTime));
+
+            // Show the clear button
+            clear_buttons[index]->Show();
         }
         else
         {
-            // Cleared
+            // Cleared via dialog (both times = 0)
             clickedButton->SetLabel("");
             SetStatusText(wxString::Format("Solenoid %zu programming cleared", index));
+
+            // Hide the clear button
+            clear_buttons[index]->Hide();
         }
 
         clickedButton->Refresh();
+        Layout(); // Refresh layout to show/hide clear button
     }
+}
+
+void MyFrame::Clear_Button_Clicked(wxCommandEvent &event)
+{
+    int button_id = event.GetId();
+    size_t index = button_id - CLEAR_BUTTON_ID_BASE;
+
+    // Clear the programming
+    controller.clearSolenoid(index);
+
+    // Update main button
+    sol_buttons[index]->SetLabel("");
+
+    // Hide clear button
+    clear_buttons[index]->Hide();
+
+    // Update appearance
+    UpdateButtonAppearance(index);
+
+    SetStatusText(wxString::Format("Solenoid %zu programming cleared", index));
+    Layout();
 }
 
 void MyFrame::OnSerialPortSelected(wxCommandEvent &event)
@@ -356,7 +417,7 @@ void MyFrame::OnSerialPortSelected(wxCommandEvent &event)
         close_port();
     }
 
-    // Open the serial port (flags parameter not used in libserialport version)
+    // Open the serial port
     int result = init_serial(port, 0);
 
     if (result < 0)
@@ -368,7 +429,7 @@ void MyFrame::OnSerialPortSelected(wxCommandEvent &event)
 
     // Configure the serial port
     struct serial_config config;
-    config.baud = B115200; // Now using enum value
+    config.baud = B115200;
     config.parity = false;
     config.one_stop_bit = true;
     config.data_size = DATA_8B;
@@ -449,4 +510,135 @@ void MyFrame::UpdateButtonAppearance(size_t index)
     }
 
     button->Refresh();
+}
+
+void MyFrame::UpdateClearButtonVisibility(size_t index)
+{
+    if (index >= clear_buttons.size())
+        return;
+
+    const Solenoid &sol = controller.getState().get(index);
+
+    if (sol.programmed)
+    {
+        clear_buttons[index]->Show();
+    }
+    else
+    {
+        clear_buttons[index]->Hide();
+    }
+
+    Layout();
+}
+
+// ============================================================================
+// Serial Port Management
+// ============================================================================
+
+void MyFrame::PopulateSerialPortMenu()
+{
+    // Remove all existing port items (but keep the Refresh item and separator)
+    // Menu items start at position 2 (0 = Refresh, 1 = Separator)
+    while (serialMenu->GetMenuItemCount() > 2)
+    {
+        wxMenuItem *item = serialMenu->FindItemByPosition(2);
+        if (item)
+        {
+            serialMenu->Delete(item);
+        }
+    }
+
+    // Get fresh port list
+    struct serial_ports_list *ports_list = get_ports();
+
+    if (ports_list != NULL && ports_list->length > 0)
+    {
+        for (ssize_t i = 0; i < ports_list->length; i++)
+        {
+            int menu_id = Serial_Menu_ID + i;
+            serialMenu->Append(menu_id, ports_list->list[i], "Open This Port");
+            Bind(wxEVT_MENU, &MyFrame::OnSerialPortSelected, this, menu_id);
+        }
+
+        // Free port list memory
+        for (ssize_t i = 0; i < ports_list->length; i++)
+        {
+            free(ports_list->list[i]);
+        }
+        free(ports_list->list);
+        free(ports_list);
+
+        // Only update status if status bar exists
+        if (GetStatusBar())
+        {
+            SetStatusText(wxString::Format("Found %d serial port(s)", ports_list->length));
+        }
+    }
+    else
+    {
+        // No ports found - add a disabled menu item to show this
+        wxMenuItem *noPortsItem = serialMenu->Append(wxID_ANY, "(No ports found)", "");
+        noPortsItem->Enable(false);
+
+        if (ports_list != NULL)
+        {
+            free(ports_list);
+        }
+
+        // Only update status if status bar exists
+        if (GetStatusBar())
+        {
+            SetStatusText("No serial ports found");
+        }
+    }
+}
+
+void MyFrame::OnRefreshPorts(wxCommandEvent &event)
+{
+    PopulateSerialPortMenu();
+    SetStatusText("Port list refreshed", 0);
+}
+
+// NEW: Auto-refresh timer handler, update ports list (prev vs curr compare)
+void MyFrame::OnPortRefreshTimer(wxTimerEvent &event)
+{
+    // Build current list of port names
+    struct serial_ports_list *ports_list = get_ports();
+    
+    static std::vector<std::string> lastPorts;
+    std::vector<std::string> currentPorts;
+    
+    if (ports_list != NULL)
+    {
+        for (ssize_t i = 0; i < ports_list->length; i++)
+        {
+            currentPorts.push_back(std::string(ports_list->list[i]));
+        }
+        
+        // Free memory
+        for (ssize_t i = 0; i < ports_list->length; i++)
+        {
+            free(ports_list->list[i]);
+        }
+        free(ports_list->list);
+        free(ports_list);
+    }
+    
+    // Check if the list changed
+    if (currentPorts != lastPorts)
+    {
+        PopulateSerialPortMenu();
+        
+        // Notify user of change
+        if (currentPorts.size() > lastPorts.size())
+        {
+            SetStatusText("New serial port detected!");
+        }
+        else if (currentPorts.size() < lastPorts.size())
+        {
+            SetStatusText("Serial port disconnected");
+        }
+        
+        lastPorts = currentPorts;
+    }
 }
