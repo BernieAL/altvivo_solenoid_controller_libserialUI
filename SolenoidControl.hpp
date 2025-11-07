@@ -40,6 +40,7 @@ public:
     //Pressure operations
     void setPositivePressure(int percentage);
     void setVacuum(int percentage);
+    
 
     //state access (read-only)
     const SolenoidState& getState() const { return state; }

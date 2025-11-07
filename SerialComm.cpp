@@ -4,7 +4,6 @@
 #include <string.h>
 #include "SerialComm.hpp"
 
-
 static struct sp_port *port = NULL;
 // timeout for send/recieve
 static int timeout = 1000;
@@ -12,7 +11,6 @@ static int timeout = 1000;
 // INIT SERIAL
 int init_serial(const char *port_name, unsigned int flags)
 {
-
 
   enum sp_return result;
 
@@ -121,43 +119,44 @@ struct serial_ports_list *get_ports()
   // sp_list_ports() gets us the ports, we store in port_list struct
   enum sp_return result = sp_list_ports(&port_list);
 
-  
   if (result != SP_OK)
   {
     printf("sp_list_ports() failed!\n");
     return NULL;
   }
 
-  //allocate return structure
-  struct serial_ports_list* ret = (struct serial_ports_list*)
-  malloc(sizeof(struct serial_ports_list));
-  ret -> list = (char**)malloc(sizeof(char*));
-  ret -> length = 0;
-
+  // allocate return struct
+  //must cast because malloc returns type void*
+  struct serial_ports_list *ret = (struct serial_ports_list *)malloc(sizeof(struct serial_ports_list));
+  
+  //create list of chars, allocate space for 1 ptr
+  ret->list = (char **)malloc(sizeof(char *));
+  ret->length = 0;
 
   // iterate through ports - do usb/acm filtering
-  //checking 4th char of each port in dev/tty, if starts with A or U
-  for (int i = 0; port_list[i] != NULL; i++){
-    const char* port_name = sp_get_port_name(port_list[i]);
+  // checking 4th char of each port in dev/tty, if starts with A or U
+  for (int i = 0; port_list[i] != NULL; i++)
+  {
+    const char *port_name = sp_get_port_name(port_list[i]);
 
-    if(strstr(port_name,"ttyUSB") || strstr(port_name,"ttyACM")){
+    if (strstr(port_name, "ttyUSB") || strstr(port_name, "ttyACM"))
+    {
 
-      //allocate and copy port name
-      ret -> list[ret->length] = (char*)malloc(strlen(port_name) + 1);
-      strcpy(ret->list[ret->length],port_name);
+      // allocate and copy port name
+      ret->list[ret->length] = (char *)malloc(strlen(port_name) + 1);
+      strcpy(ret->list[ret->length], port_name);
 
       ret->length++;
-      ret->list = (char**)realloc(ret->list, (ret->length + 1) * sizeof(char*));
-      
+      ret->list = (char **)realloc(ret->list, (ret->length + 1) * sizeof(char *));
+
       printf("Found USB serial port: %s\n", port_name);
     }
-  } 
+  }
 
-//Free the port list after copying the names we needed
-sp_free_port_list(port_list);
+  // Free the port list after copying the names we needed
+  sp_free_port_list(port_list);
 
-return ret;
-
+  return ret;
 }
 
 // write bytes with ACK from mcu and 1ms retry
@@ -178,7 +177,7 @@ ssize_t write_bytes(unsigned char *bytes, unsigned int length)
   {
 
     printf("Attempt %d: Sending %d bytes: ", attempt + 1, length);
-    //loop through each byte in
+    // loop through each byte in
     for (int i = 0; i < length; i++)
     {
       printf("0x%02X ", bytes[i]);
@@ -234,7 +233,8 @@ ssize_t write_bytes(unsigned char *bytes, unsigned int length)
 }
 
 // read bytes
-ssize_t read_byte(unsigned char *byte){
+ssize_t read_byte(unsigned char *byte)
+{
   if (!port)
     return -1;
 
@@ -261,13 +261,16 @@ ssize_t read_byte(unsigned char *byte){
 }
 
 // check if serial is open
-bool serial_is_open(){
+bool serial_is_open()
+{
   return port != NULL;
 }
 
 // close port
-void close_port(){
-  if(port){
+void close_port()
+{
+  if (port)
+  {
     sp_close(port);
     sp_free_port(port);
     port = NULL;

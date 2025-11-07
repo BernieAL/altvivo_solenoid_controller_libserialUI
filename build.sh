@@ -1,12 +1,19 @@
 #!/usr/bin/bash
 
-SRC_FILES="main.cpp SolenoidControl.cpp SolenoidState.cpp SerialComm.cpp"
+# Source files
+SRC_FILES="main_gui.cpp SolenoidControl.cpp SolenoidState.cpp SerialComm.cpp SolenoidTimingDialog.cpp"
 
-# Remove prev build
-rm -fv test-solenoid
+# Remove previous build
+rm -fv solenoid-control
 
-# Recompile
-g++ -o test-solenoid -std=c++11 $SRC_FILES -g
+# Get wxWidgets flags
+WX_CXXFLAGS=`wx-config --cxxflags`
+WX_LIBS=`wx-config --libs`
+
+# Recompile with all flags
+g++ -o solenoid-control -std=c++11 $SRC_FILES $WX_CXXFLAGS $WX_LIBS -lserialport -g
+
+
 
 # Execute program
 ./test-solenoid

@@ -196,3 +196,79 @@ unsigned char data[] = {0xFE, 0xED, 0x01, 0x03, 0x01, 0x00};
 The MCU on the other end checks for the header bytes
 only if header bytes are rec'd that match FEED do we read the rest of the
 bytes and execute the command
+
+
+-------------------------------------------
+-------------------------------------------
+
+Finding Serial Ports
+
+first sp_list_ports scans the system and finds all serial ports
+it returns them in port_list (enum), this includes USB ports, BT, virtual ports
+
+we then create our structure to hold fitlered results
+this will hold all our usb ports that we find
+
+ret is a pointer to a struct
+we tell compiler to allocate enough space for a serial_ports_list struct
+-malloc returns an address with pointer of type void*
+-we cast the returned void* pointer to be type serial_ports_list
+-we do this, so the compiler knows what values are available to the pointer
+-if the pointer was just void*, then we couldnt acccess the fields that are available to serial_ports_list struct 
+    (ex.  struct SolenoidTiming timing;
+          bool active;
+          bool programed;)
+
+we then loop through all the ports returned by sp_list_ports
+if it matches our criteria of being USB or ACM, then we copy 
+that port name and store in our return structure
+
+to copy the port name, we allocate mem on our return struct for it
+we do this because the name length can vary.
+we then grow the array for the next potential port
+
+
+---
+
+
+Allocate space for the struct - will hold all filtered port names
+
+(inside struct)
+Allocate space for dynamic array - starting with 1 slot
+array will hold pointers to strings
+    struct serial_ports_list* ret = (
+        struct serial_ports_list*) malloc(sizeof(struct serial_ports_list)
+    );
+
+(in array)
+Allocate space for the string itself (variable length)
+    ret->list[i] = malloc(strlen(port_name) + 1);
+
+Copy the string to the array
+    strcpy(ret->list[i], port_name);
+
+Grow the array for the next port
+    ret->list = realloc(ret->list, (ret->length + 1) * sizeof(char*));
+
+
+
+```
+
+---
+
+## Visual Confirmation
+```
+┌─────────────────────────────────────────┐
+│ struct serial_ports_list (on heap)     │
+│ ┌─────────────────────────────────────┐ │
+│ │ list: → [dynamic array on heap]    │ │ ← Grows with realloc
+│ │         ┌─────────────────────────┐ │ │
+│ │         │ [0] → "/dev/ttyUSB0\0"  │ │ │ ← Allocated per string
+│ │         │ [1] → "/dev/ttyACM0\0"  │ │ │ ← Allocated per string
+│ │         │ [2] → "/dev/ttyUSB1\0"  │ │ │ ← Allocated per string
+│ │         │ [3] (empty slot)        │ │ │ ← Room for next
+│ │         └─────────────────────────┘ │ │
+│ │                                     │ │
+│ │ length: 3                           │ │
+│ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
