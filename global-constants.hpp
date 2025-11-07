@@ -1,8 +1,10 @@
 #ifndef __GLOBAL_CONSTANTS__
 #define __GLOBAL_CONSTANTS__
 
+// Grid layout
 #define NUM_OF_ROWS 4
 #define NUM_OF_COLS 4
+#define NUM_OF_SOLENOIDS 16
 
 #define HORIZONTAL_MARGIN 4
 #define VERTICAL_MARGIN 4
@@ -16,21 +18,11 @@
 #define BUTTON_GREEN wxColour(0x00, 0xC8, 0x00)
 
 
-struct SolenoidTiming
-{
-    int openTime;   // in milliseconds
-    int closeTime;  // in milliseconds
-};
-
-struct Solenoid
-{
-  struct SolenoidTiming timing;
-  bool active;
-  bool programed;
-};
+struct SolenoidTiming;
+struct Solenoid;
 
 enum sol_ids
-  {
+{
     ID_SOL0 = SOL_ID_BASE,
     ID_SOL1,
     ID_SOL2,
@@ -47,10 +39,10 @@ enum sol_ids
     ID_SOL13,
     ID_SOL14,
     ID_SOL15
-  };
+};
 
-enum sol_idexes
-  {
+enum sol_indexes
+{
     IDX_SOL0 = 0,
     IDX_SOL1,
     IDX_SOL2,
@@ -66,10 +58,7 @@ enum sol_idexes
     IDX_SOL12,
     IDX_SOL13,
     IDX_SOL14,
-    IDX_SOL15,
-    NUM_OF_SOLENOIDS
-  };
+    IDX_SOL15
+};
 
-
-
-#endif
+#endif // __GLOBAL_CONSTANTS__

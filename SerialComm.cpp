@@ -171,6 +171,8 @@ ssize_t write_bytes(unsigned char *bytes, unsigned int length)
 
   const int MAX_RETRIES = 3;
   const unsigned int WRITE_TIMEOUT = 1000; // 1 second
+
+  //-------------------------!!!!!ASK MARK ABOUT ACK BYTE
   const unsigned char ACK_BYTE = 0xAA;     // Expected ACK from MCU
 
   for (int attempt = 0; attempt < MAX_RETRIES; attempt++)
@@ -197,6 +199,8 @@ ssize_t write_bytes(unsigned char *bytes, unsigned int length)
     printf("Successfully sent %d bytes\n", length);
 
     // Wait for ACK byte from MCU
+
+    //------------!!!!!ASK MARK ABOUT ACK ----------
     unsigned char ack_byte = 0;
     ssize_t ack_result = read_byte(&ack_byte);
 

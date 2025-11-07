@@ -1,39 +1,52 @@
-#ifndef __SOLENOID_TIMING_HPP__
-#define __SOLENOID_TIMING_HPP__
+#ifndef __SERIAL_COMM_HPP__
+#define __SERIAL_COMM_HPP__
 
-#include <wx/spinctrl.h>
-#include <wx/dialog.h>
-#include <wx/stattext.h>
-#include <wx/button.h>
-#include <wx/sizer.h>
-#include "global-constants.hpp"
- 
+#include <sys/types.h>
+#include <stdbool.h>
 
-class SolenoidTimingDialog : public wxDialog
+// Data size enumeration
+enum SerialDataSize
 {
-private:
-  wxStaticText* open_label;
-  wxStaticText* close_label;
-  wxSpinCtrl* open_time_spinner;
-  wxSpinCtrl* close_time_spinner;
-  SolenoidTiming timing;
-public:
-  SolenoidTimingDialog(wxWindow* parent);
-  SolenoidTimingDialog(wxWindow* parent, SolenoidTiming* ref);
-
-
-private:
-  void Create_Controls();
-  void Setup_Layout();
-  void OnOK(wxCommandEvent& event);
-  void OnCancel(wxCommandEvent& event);
-  void OnClear(wxCommandEvent& event);
-
-  
-public:
-  SolenoidTiming Get_Timing();
-
-
-  
+    DATA_5B = 0,
+    DATA_6B,
+    DATA_7B,
+    DATA_8B
 };
-#endif
+
+// Baud rate constants (match libserialport values)
+enum BaudRate
+{
+    B9600 = 9600,
+    B19200 = 19200,
+    B38400 = 38400,
+    B57600 = 57600,
+    B115200 = 115200
+};
+
+// Serial configuration structure
+struct serial_config
+{
+    int baud;
+    bool parity;
+    bool one_stop_bit;
+    enum SerialDataSize data_size;
+    bool hw_flow;
+};
+
+// Serial ports list structure
+struct serial_ports_list
+{
+    char** list;
+    int length;
+};
+
+// Function declarations - MUST MATCH the .cpp file exactly!
+int init_serial(const char* port_name, unsigned int flags);
+int config_serial(struct serial_config* s);
+ssize_t write_bytes(unsigned char* bytes, unsigned int length);
+ssize_t read_byte(unsigned char* byte);
+struct serial_ports_list* get_ports();
+bool serial_is_open();
+void close_port();
+
+#endif // __SERIAL_COMM_HPP__

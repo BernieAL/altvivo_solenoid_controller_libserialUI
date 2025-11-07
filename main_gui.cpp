@@ -29,14 +29,17 @@
 // ----------------------------------------------------------------------------
 
 #ifndef wxHAS_IMAGES_IN_RESOURCES
-#include "sample.xpm"
+
 #endif
 
 #include <vector>
+#include "SolenoidState.hpp"        
 #include "global-constants.hpp"
 #include "SolenoidTimingDialog.hpp"
 #include "SolenoidControl.hpp"
 #include "SerialComm.hpp"
+
+
 
 // ----------------------------------------------------------------------------
 // private classes
@@ -130,7 +133,7 @@ MyFrame::MyFrame(const wxString &title)
     : wxFrame(nullptr, wxID_ANY, title)
 {
     // Set the frame icon
-    SetIcon(wxICON(sample));
+    // SetIcon(wxICON(sample));
 
     // Set theme colors
     SetBackgroundColour(BACKGROUND_BLACK);
